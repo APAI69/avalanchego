@@ -267,6 +267,8 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 		return nil
 	}
 
+	t.Config.Context.Log.Debug("Receiving Chits(%s, %d) with %d items in votes", vdr, requestID, len(votes))
+
 	v := &voter{
 		t:         t,
 		vdr:       vdr,
@@ -348,6 +350,7 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, er
 			continue
 		}
 
+		// AARON optimize with event heap
 		for _, parent := range vtx.Parents() {
 			if !parent.Status().Fetched() {
 				t.sendRequest(vdr, parent.ID())
@@ -365,6 +368,7 @@ func (t *Transitive) insertFrom(vdr ids.ShortID, vtx avalanche.Vertex) (bool, er
 }
 
 func (t *Transitive) insert(vtx avalanche.Vertex) error {
+	t.Config.Context.Log.Debug("inserting vertex")
 	vtxID := vtx.ID()
 
 	t.pending.Add(vtxID)
@@ -453,6 +457,7 @@ func (t *Transitive) batch(txs []snowstorm.Tx, force, empty bool) error {
 }
 
 func (t *Transitive) issueRepoll() {
+	t.Config.Context.Log.Debug("Issuing repoll")
 	preferredIDs := t.Consensus.Preferences().List()
 	numPreferredIDs := len(preferredIDs)
 	if numPreferredIDs == 0 {
