@@ -204,6 +204,8 @@ func (p *peer) handle(msg Msg) {
 		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op.String())
 		return
 	}
+
+	p.net.log.Debug("Received message from peer: %s, with op: %s", p.id, op.String())
 	msgMetrics.numReceived.Inc()
 
 	switch op {
@@ -600,7 +602,6 @@ func (p *peer) pullQuery(msg Msg) {
 
 // assumes the stateLock is not held
 func (p *peer) chits(msg Msg) {
-	p.net.log.Debug("Received chits message from peer")
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
