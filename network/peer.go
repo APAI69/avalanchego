@@ -600,6 +600,7 @@ func (p *peer) pullQuery(msg Msg) {
 
 // assumes the stateLock is not held
 func (p *peer) chits(msg Msg) {
+	p.net.log.Debug("Received chits message from peer")
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
