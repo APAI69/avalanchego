@@ -129,7 +129,7 @@ func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers 
 // The PushQuery message signifies that this consensus engine would like each validator to send
 // their preferred frontier given the existence of the specified container.
 func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
-	s.ctx.Log.Verbo("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
+	s.ctx.Log.Debug("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
 	// If one of the validators in [validatorIDs] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
@@ -154,7 +154,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 // The PullQuery message signifies that this consensus engine would like each validator to send
 // their preferred frontier.
 func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
-	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
+	s.ctx.Log.Debug("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
 	// If one of the validators in [validatorIDs] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorIDs.Contains(s.ctx.NodeID) { // One of the validators in [validatorIDs] was myself
@@ -176,10 +176,11 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 // Chits sends chits
 func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set) {
-	s.ctx.Log.Verbo("Sending Chits to validator %s. RequestID: %d. Votes: %s", validatorID, requestID, votes)
+	s.ctx.Log.Debug("Sending Chits to validator %s. RequestID: %d. Votes: %s", validatorID, requestID, votes)
 	// If [validatorID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorID.Equals(s.ctx.NodeID) {
+		s.ctx.Log.Debug("Sending chits to myself")
 		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes)
 		return
 	}
@@ -188,6 +189,6 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set)
 
 // Gossip the provided container
 func (s *Sender) Gossip(containerID ids.ID, container []byte) {
-	s.ctx.Log.Verbo("Gossiping %s", containerID)
+	s.ctx.Log.Debug("Gossiping %s", containerID)
 	s.sender.Gossip(s.ctx.ChainID, containerID, container)
 }

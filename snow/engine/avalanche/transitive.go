@@ -300,7 +300,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	switch msg {
 	case common.PendingTxs:
-		txs := t.Config.VM.PendingTxs()
+		txs := t.Config.VM.PendingTxs() // can this return too many transactions to pack and block from issuing?
 		return t.batch(txs, false /*=force*/, false /*=empty*/)
 	}
 	return nil
@@ -480,7 +480,7 @@ func (t *Transitive) issueRepoll() {
 }
 
 func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
-	t.Config.Context.Log.Verbo("batching %d transactions into a new vertex", len(txs))
+	t.Config.Context.Log.Debug("batching %d transactions into a new vertex", len(txs))
 
 	virtuousIDs := t.Consensus.Virtuous().List()
 	sampler := random.Uniform{N: len(virtuousIDs)}
@@ -489,6 +489,7 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 		parentIDs.Add(virtuousIDs[sampler.Sample()])
 	}
 
+	t.Config.Context.Log.Debug("Building vertex with %d parents and % txs", len(parentIDs), len(txs))
 	vtx, err := t.Config.State.BuildVertex(parentIDs, txs)
 	if err != nil {
 		t.Config.Context.Log.Warn("error building new vertex with %d parents and %d transactions", len(parentIDs), len(txs))

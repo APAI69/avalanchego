@@ -309,6 +309,7 @@ func (vm *VM) IssueTx(b []byte, onDecide func(choices.Status)) (ids.ID, error) {
 	if err := tx.Verify(); err != nil {
 		return ids.ID{}, err
 	}
+	vm.ctx.Log.Debug("Issuing transaction\n")
 	vm.issueTx(tx)
 	tx.onDecide = onDecide
 	return tx.ID(), nil
