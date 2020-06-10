@@ -89,7 +89,7 @@ func (p *peer) ReadMessages() {
 	for {
 		read, err := p.conn.Read(readBuffer)
 		if err != nil {
-			p.net.log.Verbo("error on connection read to %s %s", p.id, err)
+			p.net.log.Debug("error on connection read to %s %s", p.id, err)
 			return
 		}
 
@@ -106,7 +106,7 @@ func (p *peer) ReadMessages() {
 				// we have read more bytes than the max message size allows for,
 				// so we should terminate this connection
 
-				p.net.log.Verbo("error reading too many bytes on %s %s", p.id, err)
+				p.net.log.Debug("error reading too many bytes on %s %s", p.id, err)
 				return
 			}
 
@@ -125,11 +125,11 @@ func (p *peer) ReadMessages() {
 			// if this message is longer than the max message length, then we
 			// should terminate this connection
 
-			p.net.log.Verbo("error reading too many bytes on %s %s", p.id, err)
+			p.net.log.Debug("error reading too many bytes on %s %s", p.id, err)
 			return
 		}
 
-		p.net.log.Verbo("parsing new message from %s:\n%s",
+		p.net.log.Debug("parsing new message from %s:\n%s",
 			p.id,
 			formatting.DumpBytes{Bytes: msgBytes})
 
