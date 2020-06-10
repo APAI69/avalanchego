@@ -287,6 +287,7 @@ func (m *manager) ForceCreateChain(chain ChainParameters) {
 		m.log.Error("couldn't get validator set of subnet with ID %s. The subnet may not exist", chain.SubnetID)
 		return
 	}
+	ctx.Log.Debug("Num validators: %d", validators.Len())
 
 	beacons := validators
 	if chain.CustomBeacons != nil {

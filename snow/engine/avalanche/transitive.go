@@ -166,7 +166,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 
 // Put implements the Engine interface
 func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxBytes []byte) error {
-	t.Config.Context.Log.Verbo("Put(%s, %d, %s) called", vdr, requestID, vtxID)
+	t.Config.Context.Log.Debug("Put(%s, %d, %s) called", vdr, requestID, vtxID)
 
 	if !t.bootstrapped { // Bootstrapping unfinished --> didn't call Get --> this message is invalid
 		t.Config.Context.Log.Debug("dropping Put(%s, %d, %s) due to bootstrapping", vdr, requestID, vtxID)
