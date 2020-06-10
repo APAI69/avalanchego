@@ -256,6 +256,7 @@ func (n *Node) initNodeID() error {
 	if !n.Config.EnableStaking {
 		n.ID = ids.NewShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.String())))
 		n.Log.Info("Set the node's ID to %s", n.ID)
+		n.Log.Info("based on StakingIP: %s", n.Config.StakingIP.String())
 		return nil
 	}
 

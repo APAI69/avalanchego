@@ -485,6 +485,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 
 // Chits implements the Sender interface.
 func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes ids.Set) {
+	n.log.Debug("Sending chits message with %d votes", votes.Len())
 	msg, err := n.b.Chits(chainID, requestID, votes)
 	if err != nil {
 		n.log.Error("failed to build Chits message because of %d votes", votes.Len())

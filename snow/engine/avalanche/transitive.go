@@ -290,6 +290,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) err
 
 // QueryFailed implements the Engine interface
 func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+	t.Config.Context.Log.Debug("Query failed, calling chits with empty set")
 	return t.Chits(vdr, requestID, ids.Set{})
 }
 

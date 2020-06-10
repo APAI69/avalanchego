@@ -205,7 +205,6 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 
-	p.net.log.Debug("Received message from peer: %s, with op: %s", p.id, op.String())
 	msgMetrics.numReceived.Inc()
 
 	switch op {
@@ -615,6 +614,7 @@ func (p *peer) chits(msg Msg) {
 		}
 		containerIDs.Add(containerID)
 	}
+	p.net.log.Debug("Received chits message from peer with %d votes", containerIDs.Len())
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)
 }
