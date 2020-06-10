@@ -76,6 +76,7 @@ func (i *issuer) Update() {
 	vdrSet := ids.ShortSet{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
 		vdrSet.Add(vdr.ID())
+		i.t.Config.Context.Log.Debug("Sampling validator %s", vdr.ID())
 	}
 
 	i.t.RequestID++

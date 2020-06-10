@@ -475,6 +475,7 @@ func (t *Transitive) issueRepoll() {
 	vdrSet := ids.ShortSet{} // Validators to sample repr. as a set
 	for _, vdr := range vdrs {
 		vdrSet.Add(vdr.ID())
+		t.Config.Context.Log.Debug("Repolling validator with ID : %s", vdr.ID())
 	}
 
 	t.RequestID++
