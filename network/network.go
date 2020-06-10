@@ -780,12 +780,13 @@ func (n *network) connectTo(ip utils.IPDesc) {
 // assumes the stateLock is not held. Returns nil if a connection was able to be
 // established, or the network is closed.
 func (n *network) attemptConnect(ip utils.IPDesc) error {
-	n.log.Verbo("attempting to connect to %s", ip)
+	n.log.Debug("attempting to connect to %s", ip)
 
 	conn, err := n.dialer.Dial(ip)
 	if err != nil {
 		return err
 	}
+	n.log.Debug("attempting to upgrade peer")
 	return n.upgrade(&peer{
 		net:  n,
 		ip:   ip,
@@ -798,7 +799,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	id, conn, err := upgrader.Upgrade(p.conn)
 	if err != nil {
-		n.log.Verbo("failed to upgrade connection with %s", err)
+		n.log.Debug("failed to upgrade connection with %s", err)
 		return err
 	}
 	p.sender = make(chan []byte, n.sendQueueSize)
@@ -864,6 +865,7 @@ func (n *network) validatorIPs() []utils.IPDesc {
 			ips = append(ips, peer.ip)
 		}
 	}
+	n.log.Debug("There are %d validator IPs found", len(ips))
 	return ips
 }
 
