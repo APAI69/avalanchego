@@ -146,6 +146,7 @@ func (n *Node) initNetworking() error {
 	// Initialize validator manager and default subnet's validator set
 	defaultSubnetValidators := validators.NewSet()
 	if !n.Config.EnableStaking {
+		n.Log.Debug("Putting myself in as a validator because staking is disabled: %s", n.ID)
 		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 	}
 	n.vdrs = validators.NewManager()
@@ -337,6 +338,7 @@ func (n *Node) initChains() error {
 		defaultSubnetValidators := validators.NewSet()
 		defaultSubnetValidators.Add(validators.NewValidator(n.ID, 1))
 		vdrs = validators.NewManager()
+		n.Log.Debug("Putting validator set of length %d", defaultSubnetValidators.Len())
 		vdrs.PutValidatorSet(platformvm.DefaultSubnetID, defaultSubnetValidators)
 	}
 

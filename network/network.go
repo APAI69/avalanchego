@@ -639,6 +639,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 		numToGossip = len(allPeers)
 	}
 
+	n.log.Debug("Sampling from %d peers", len(allPeers))
 	sampler := random.Uniform{N: len(allPeers)}
 	for i := 0; i < numToGossip; i++ {
 		if allPeers[sampler.Sample()].send(msg) {
