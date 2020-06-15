@@ -1356,6 +1356,7 @@ func (service *Service) ExportAVA(_ *http.Request, args *ExportAVAArgs, reply *E
 			},
 		},
 	}}
+	service.vm.ctx.Log.Info("Createx Export Output with Address: %s", args.To.String())
 
 	outs := []*ava.TransferableOutput{}
 	if amountSpent > uint64(args.Amount) {

@@ -638,6 +638,7 @@ func (vm *VM) resetTimer() {
 	// If there is a pending transaction, trigger building of a block with that
 	// transaction
 	if len(vm.unissuedDecisionTxs) > 0 || len(vm.unissuedAtomicTxs) > 0 {
+		vm.Ctx.Log.Info("Notifying block ready for unissued txs")
 		vm.SnowmanVM.NotifyBlockReady()
 		return
 	}
@@ -856,13 +857,13 @@ func (vm *VM) GetAtomicUTXOs(addrs ids.Set) ([]*ava.UTXO, error) {
 		utxoIDs.Add(utxos...)
 	}
 
-	utxos := []*ava.UTXO{}
-	for _, utxoID := range utxoIDs.List() {
+	utxos := make([]*ava.UTXO, utxoIDs.Len())
+	for index, utxoID := range utxoIDs.List() {
 		utxo, err := state.AVMUTXO(utxoID)
 		if err != nil {
 			return nil, err
 		}
-		utxos = append(utxos, utxo)
+		utxos[index] = utxo
 	}
 	return utxos, nil
 }

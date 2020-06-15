@@ -5,6 +5,7 @@ package secp256k1fx
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/hashing"
@@ -130,6 +131,7 @@ func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) err
 	if !ok {
 		return errWrongUTXOType
 	}
+	fmt.Printf("verifying spend\n")
 	return fx.VerifySpend(tx, in, cred, out)
 }
 
@@ -138,6 +140,7 @@ func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *Tran
 	if err := verify.All(utxo, in, cred); err != nil {
 		return err
 	}
+	fmt.Printf("Verified all verifiables\n")
 
 	clock := fx.VM.Clock()
 	switch {
@@ -146,6 +149,8 @@ func (fx *Fx) VerifySpend(tx Tx, in *TransferInput, cred *Credential, utxo *Tran
 	case utxo.Locktime > clock.Unix():
 		return errTimelocked
 	}
+
+	fmt.Printf("Trying to verify credentials:\n\n")
 
 	return fx.VerifyCredentials(tx, &in.Input, cred, &utxo.OutputOwners)
 }
@@ -180,6 +185,8 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 		}
 
 		expectedAddress := out.Addrs[index]
+		fmt.Printf("Expected Address is: %s", expectedAddress.String())
+		fmt.Printf("Public Key Address is : %s", pk.Address().String())
 		if !expectedAddress.Equals(pk.Address()) {
 			return errWrongSigner
 		}

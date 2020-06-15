@@ -184,7 +184,8 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 		cred := tx.Creds[i]
 
 		utxoID := in.UTXOID.InputID()
-		utxo, err := state.AVMUTXO(utxoID)
+		// Easy fix only look for UTXOs controlled by this address in the first place
+		utxo, err := state.AVMUTXO(utxoID) // Problem - this just returns any utxo, does not specify only the utxos that are meant to be spent by the address
 		if err != nil {
 			return err
 		}
@@ -194,6 +195,9 @@ func (tx *ImportTx) SemanticVerify(db database.Database) error {
 			return errAssetIDMismatch
 		}
 
+		// Why doesn't verify transfer catch the illegal operation? What is the output owners set to on the UTXO???
+		// Output Owners appears to be set correctly
+		fmt.Printf("Verifying Platform ImportAVA")
 		if err := tx.vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
 			return err
 		}

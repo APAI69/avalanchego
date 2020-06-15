@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/gecko/utils/formatting"
 	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/json"
-	"github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/components/ava"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
@@ -1058,17 +1057,14 @@ func (service *Service) signAddNonDefaultSubnetValidatorTx(tx *addNonDefaultSubn
 	return tx, nil
 }
 
-// ImportAVAArgs are the arguments to ImportAVA
 type ImportAVAArgs struct {
-	// ID of the account that will receive the imported funds, and pay the transaction fee
-	To string `json:"to"`
-
-	// Next nonce of the sender
+	// intended account as defined in the exportTx
+	From string `json:"from"`
+	// new account destination
+	To         string      `json:"to"`
 	PayerNonce json.Uint64 `json:"payerNonce"`
-
-	// User that controls the account
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username   string      `json:"username"`
+	Password   string      `json:"password"`
 }
 
 // ImportAVA returns an unsigned transaction to import AVA from the X-Chain.
@@ -1083,73 +1079,65 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 	case args.PayerNonce == 0:
 		return fmt.Errorf("sender's next nonce not specified")
 	}
-
+	// account to send AVA to
 	toID, err := service.vm.ParseAddress(args.To)
 	if err != nil {
-		return fmt.Errorf("problem parsing address in 'to' field %w", err)
+		return err
 	}
-
-	// Get the key of the Signer
+	// the original, intended destination for the exportTx
+	fromID, err := service.vm.ParseAddress(args.From)
+	if err != nil {
+		return err
+	}
+	// Use a key that is different from the account that generated the exportTx
 	db, err := service.vm.Ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
-		return fmt.Errorf("couldn't get user: %w", err)
+		return err
 	}
 	user := user{db: db}
-
 	kc := secp256k1fx.NewKeychain()
 	key, err := user.getKey(toID)
 	if err != nil {
-		return errDB
+		return err
 	}
 	kc.Add(key)
 
 	addrSet := ids.Set{}
-	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(toID.Bytes())))
-
+	// Grab the UTXO for the target address
+	// Fetch the utxos for the from address
+	addrSet.Add(ids.NewID(hashing.ComputeHash256Array(fromID.Bytes())))
 	utxos, err := service.vm.GetAtomicUTXOs(addrSet)
-	if err != nil {
-		return fmt.Errorf("problem retrieving user's atomic UTXOs: %w", err)
-	}
 
+	// Import the amount contained in the utxo
 	amount := uint64(0)
-	time := service.vm.clock.Unix()
 
 	ins := []*ava.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
-		if !utxo.AssetID().Equals(service.vm.ava) {
-			continue
+		switch out := utxo.Out.(type) {
+		case *secp256k1fx.TransferOutput:
+			amount = out.Amt
 		}
-		inputIntf, signers, err := kc.Spend(utxo.Out, time)
-		if err != nil {
-			continue
+		signers := []*crypto.PrivateKeySECP256K1R{}
+		// should not pass verification with this key
+		// Sign with the key for wrong address, not the key that corresponds to the 'to' field in the importTx
+		signers = append(signers, key)
+		// use a modified TransferInput containing the utxo.out amount and a zero'd SigIndices
+		// Zero index refers to the key in the "To" field which is the address trying to steal the funds
+		input := &secp256k1fx.TransferInput{
+			Amt:   amount,
+			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 		}
-		input, ok := inputIntf.(ava.Transferable)
-		if !ok {
-			continue
-		}
-		spent, err := math.Add64(amount, input.Amount())
-		if err != nil {
-			return err
-		}
-		amount = spent
-
 		in := &ava.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  ava.Asset{ID: service.vm.ava},
 			In:     input,
 		}
-
 		ins = append(ins, in)
 		keys = append(keys, signers)
 	}
-
-	if amount == 0 {
-		return errNoFunds
-	}
-
+	//Unmodified below
 	ava.SortTransferableInputsWithSigners(ins, keys)
-
 	// Create the transaction
 	tx := ImportTx{UnsignedImportTx: UnsignedImportTx{
 		NetworkID: service.vm.Ctx.NetworkID,
@@ -1157,21 +1145,17 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		Account:   toID,
 		Ins:       ins,
 	}}
-
-	// TODO: Should we check if tx is already signed?
 	unsignedIntf := interface{}(&tx.UnsignedImportTx)
 	unsignedTxBytes, err := Codec.Marshal(&unsignedIntf)
 	if err != nil {
 		return fmt.Errorf("error serializing unsigned tx: %w", err)
 	}
 	hash := hashing.ComputeHash256(unsignedTxBytes)
-
 	sig, err := key.SignHash(hash)
 	if err != nil {
 		return errors.New("error while signing")
 	}
 	copy(tx.Sig[:], sig)
-
 	for _, credKeys := range keys {
 		cred := &secp256k1fx.Credential{}
 		for _, key := range credKeys {
@@ -1186,12 +1170,10 @@ func (service *Service) ImportAVA(_ *http.Request, args *ImportAVAArgs, response
 		}
 		tx.Creds = append(tx.Creds, cred)
 	}
-
 	txBytes, err := Codec.Marshal(genericTx{Tx: &tx})
 	if err != nil {
 		return errCreatingTransaction
 	}
-
 	response.Tx.Bytes = txBytes
 	return nil
 }
@@ -1263,7 +1245,7 @@ type IssueTxResponse struct {
 
 // IssueTx issues the transaction [args.Tx] to the network
 func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *IssueTxResponse) error {
-	service.vm.Ctx.Log.Debug("issueTx called")
+	service.vm.Ctx.Log.Info("issueTx called")
 
 	genTx := genericTx{}
 	if err := Codec.Unmarshal(args.Tx.Bytes, &genTx); err != nil {
@@ -1289,6 +1271,7 @@ func (service *Service) IssueTx(_ *http.Request, args *IssueTxArgs, response *Is
 		}
 		service.vm.unissuedAtomicTxs = append(service.vm.unissuedAtomicTxs, tx)
 		response.TxID = tx.ID()
+		service.vm.Ctx.Log.Info("Added to unissued atomic transactions")
 	default:
 		return errors.New("Could not parse given tx. Must be a TimedTx, DecisionTx, or AtomicTx")
 	}
