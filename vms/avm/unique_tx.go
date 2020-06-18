@@ -83,6 +83,10 @@ func (tx *UniqueTx) refresh() {
 	}
 }
 
+func (tx *UniqueTx) Updated() bool {
+	return tx.TxState != nil && tx.TxState.status.Fetched()
+}
+
 // Evict is called when this UniqueTx will no longer be returned from a cache
 // lookup
 func (tx *UniqueTx) Evict() { tx.unique = false } // Lock is already held here

@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/gecko/snow/choices"
+
 	"github.com/ava-labs/gecko/database/memdb"
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
@@ -496,6 +498,67 @@ func TestIssueTx(t *testing.T) {
 
 	if txs := vm.PendingTxs(); len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+}
+
+func TestParseTxRetrievesFromCache(t *testing.T) {
+	genesisBytes, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := NewTx(t, genesisBytes, vm)
+
+	tx, err := vm.ParseTx(newTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tx.Status() != choices.Processing {
+		t.Fatal("Newly processed transaction should have been set to processing")
+	}
+
+	tx2, err := vm.ParseTx(newTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tx2 != tx {
+		t.Fatal("ParseTx should have returned the cached transaction")
+	}
+}
+
+func TestParseTxParsesAfterCacheMiss(t *testing.T) {
+	genesisBytes, _, vm := GenesisVM(t)
+	defer func() {
+		vm.Shutdown()
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := NewTx(t, genesisBytes, vm)
+	uTx := &UniqueTx{
+		TxState: &TxState{
+			Tx: newTx,
+		},
+		vm:   vm,
+		txID: newTx.ID(),
+	}
+
+	// Cache Miss for Unique Tx
+	missedTx := vm.state.UniqueTx(uTx)
+	if uTx != missedTx {
+		t.Fatal("Newly created transaction should not have been retrieved from cache")
+	}
+
+	// Parse works correctly after a cache miss
+	tx, err := vm.ParseTx(newTx.Bytes())
+	if err != nil {
+		t.Fatalf("Parsing tx failed due to: %w", err)
+	}
+
+	if tx.Status() != choices.Processing {
+		t.Fatal("Parsed tx should have status: Processing")
 	}
 }
 
