@@ -20,12 +20,13 @@ import (
 	"github.com/ava-labs/gecko/snow/choices"
 	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/formatting"
+	"github.com/ava-labs/gecko/utils/hashing"
 	"github.com/ava-labs/gecko/utils/logging"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
 	"github.com/ava-labs/gecko/vms/components/ava"
-	"github.com/ava-labs/gecko/utils/codec"
 
 	cjson "github.com/ava-labs/gecko/utils/json"
 )
@@ -470,20 +471,12 @@ func (vm *VM) initState(genesisBytes []byte) error {
 }
 
 func (vm *VM) parseTx(b []byte) (*UniqueTx, error) {
-	rawTx := &Tx{}
-	err := vm.codec.Unmarshal(b, rawTx)
-	if err != nil {
-		return nil, err
-	}
-	rawTx.Initialize(b)
-
 	tx := &UniqueTx{
-		TxState: &TxState{
-			Tx: rawTx,
-		},
-		vm:   vm,
-		txID: rawTx.ID(),
+		vm:    vm,
+		txID:  ids.NewID(hashing.ComputeHash256Array(b)),
+		bytes: b,
 	}
+
 	if err := tx.SyntacticVerify(); err != nil {
 		return nil, err
 	}

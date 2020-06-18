@@ -26,8 +26,9 @@ var (
 type UniqueTx struct {
 	*TxState
 
-	vm   *VM
-	txID ids.ID
+	bytes []byte
+	vm    *VM
+	txID  ids.ID
 }
 
 // TxState ...
@@ -74,10 +75,21 @@ func (tx *UniqueTx) refresh() {
 		return
 	}
 
-	if prevTx == nil {
+	if prevTx == nil && tx.bytes == nil {
 		if innerTx, err := tx.vm.state.Tx(tx.ID()); err == nil {
 			tx.Tx = innerTx
 		}
+	} else if prevTx == nil && tx.bytes != nil {
+		rawTx := &Tx{}
+		err := tx.vm.codec.Unmarshal(tx.bytes, rawTx)
+		if err != nil {
+			tx.bytes = nil
+			tx.Tx = prevTx
+			return
+		}
+		rawTx.Initialize(tx.bytes)
+
+		tx.Tx = rawTx
 	} else {
 		tx.Tx = prevTx
 	}
