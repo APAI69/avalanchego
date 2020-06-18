@@ -61,16 +61,23 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm avaeng.DAGVM, db database.
 
 // ParseVertex implements the avalanche.State interface
 func (s *Serializer) ParseVertex(b []byte) (avacon.Vertex, error) {
+	uVtx := &uniqueVertex{
+		serializer: s,
+		vtxID:      ids.NewID(hashing.ComputeHash256Array(b)),
+	}
+	unique := s.state.UniqueVertex(uVtx)
+	// If de-duplication retrieves a different vertex,
+	// then return the vertex retrieved from the cache
+	if unique != uVtx && unique.updated() {
+		return unique, nil
+	}
+
 	vtx, err := s.parseVertex(b)
 	if err != nil {
 		return nil, err
 	}
 	if err := vtx.Verify(); err != nil {
 		return nil, err
-	}
-	uVtx := &uniqueVertex{
-		serializer: s,
-		vtxID:      vtx.ID(),
 	}
 	if uVtx.Status() == choices.Unknown {
 		uVtx.setVertex(vtx)

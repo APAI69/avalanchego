@@ -51,6 +51,10 @@ func (vtx *uniqueVertex) refresh() {
 	}
 }
 
+func (vtx *uniqueVertex) updated() bool {
+	return vtx.v != nil && vtx.v.status.Fetched()
+}
+
 func (vtx *uniqueVertex) Evict() {
 	if vtx.v != nil {
 		vtx.v.unique = false
