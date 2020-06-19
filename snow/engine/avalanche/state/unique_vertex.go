@@ -29,62 +29,43 @@ type uniqueVertex struct {
 }
 
 func (vtx *uniqueVertex) refresh() {
-	parsed := false
-	parseErrored := false
-	// Prevent segfault
 	if vtx.v == nil {
 		vtx.v = &vertexState{}
 	}
 	if !vtx.v.unique {
-		fmt.Printf("vertex not unique checking de-duplicator\n")
 		unique := vtx.serializer.state.UniqueVertex(vtx)
 		prevVtx := vtx.v.vtx
 		// If de-duplicator did not return a different value from cache
-		// Then get status from db and set unique to true
+		// Then retrieve the status from the db and set unique to true
 		if unique == vtx {
-			fmt.Printf("Nobody was in the cache, checking for my own previous status\n")
 			vtx.v.status = vtx.serializer.state.Status(vtx.ID())
-			fmt.Printf("status was: %s \n", vtx.v.status.String())
 			vtx.v.unique = true
 		} else {
 			// If someone is in the cache, they must be up to date
-			fmt.Printf("somebody else was in the cache, setting ourselves to be equal\n")
+			// but may be unknown and/or be missing the bytes field
 			bytes := vtx.bytes
-			*vtx = *unique // TODO can we switch this to point to the same vertexState???
+			*vtx = *unique
 			vtx.bytes = bytes
 		}
 
 		switch {
 		case vtx.v.vtx == nil && prevVtx == nil && vtx.bytes != nil:
-			fmt.Printf("parsing unique vertex\n")
-			parsed = true
-			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err != nil {
+			// If inner vertex is not set anywhere, but the byte representation is present
+			// parse the vertex bytes instead of searching the db
+			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err == nil {
 				vtx.v.vtx = parsedVtx
-				vtx.storeAndUpdateStatus()
+				vtx.persist()
 			} else {
-				parseErrored = true
-				fmt.Printf("error while parsing vertex in unique tx\n")
 				vtx.v.vtx = &vertex{}
-				vtx.v.validity = err
 				vtx.v.verified = true
+				vtx.v.validity = err
 			}
 		case vtx.v.vtx == nil && prevVtx == nil:
-			fmt.Printf("fetching unique vertex from db\n")
 			vtx.v.vtx = vtx.serializer.state.Vertex(vtx.ID())
 		case vtx.v.vtx == nil:
-			fmt.Printf("setting to prevVtx\n")
-			if prevVtx == nil {
-				fmt.Printf("prevVtx was also nil\n")
-			}
 			vtx.v.vtx = prevVtx
 		}
 	}
-	if vtx.v.vtx == nil {
-		fmt.Printf("interior vtx was nil after refresh \n")
-		fmt.Printf("Parsed: %v \n", parsed)
-		fmt.Printf("Parse Errored: %v \n", parseErrored)
-	}
-	fmt.Printf("Finished refresh\n")
 }
 
 func (vtx *uniqueVertex) Evict() {
@@ -102,8 +83,8 @@ func (vtx *uniqueVertex) setVertex(innerVtx *vertex) {
 	}
 }
 
-// Assumes vtx.v.vtx != nil
-func (vtx *uniqueVertex) storeAndUpdateStatus() {
+// Assumes interior vertex is non-nil
+func (vtx *uniqueVertex) persist() {
 	vtx.serializer.state.SetVertex(vtx.v.vtx)
 	if status := vtx.serializer.state.Status(vtx.ID()); status == choices.Unknown {
 		vtx.serializer.state.SetStatus(vtx.ID(), choices.Processing)
