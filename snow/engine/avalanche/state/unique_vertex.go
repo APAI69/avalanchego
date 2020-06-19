@@ -29,6 +29,8 @@ type uniqueVertex struct {
 }
 
 func (vtx *uniqueVertex) refresh() {
+	parsed := false
+	parseErrored := false
 	// Prevent segfault
 	if vtx.v == nil {
 		vtx.v = &vertexState{}
@@ -48,10 +50,13 @@ func (vtx *uniqueVertex) refresh() {
 
 		switch {
 		case vtx.v.vtx == nil && prevVtx == nil && vtx.bytes != nil:
+			parsed = true
 			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err != nil {
 				vtx.v.vtx = parsedVtx
 				vtx.storeAndUpdateStatus()
 			} else {
+				parseErrored = true
+				fmt.Printf("error while parsing vertex in unique tx")
 				vtx.v.vtx = &vertex{}
 				vtx.v.validity = err
 				vtx.v.verified = true
@@ -61,6 +66,11 @@ func (vtx *uniqueVertex) refresh() {
 		case vtx.v.vtx == nil:
 			vtx.v.vtx = prevVtx
 		}
+	}
+	if vtx.v.vtx == nil {
+		fmt.Printf("interior vtx was nil after refresh \n")
+		fmt.Printf("Parsed: %v \n", parsed)
+		fmt.Printf("Parse Errored: %v \n", parseErrored)
 	}
 }
 
@@ -84,6 +94,9 @@ func (vtx *uniqueVertex) storeAndUpdateStatus() {
 	vtx.serializer.state.SetVertex(vtx.v.vtx)
 	if status := vtx.serializer.state.Status(vtx.ID()); status == choices.Unknown {
 		vtx.serializer.state.SetStatus(vtx.ID(), choices.Processing)
+		vtx.v.status = choices.Processing
+	} else {
+		vtx.v.status = status
 	}
 }
 

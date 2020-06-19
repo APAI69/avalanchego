@@ -7,6 +7,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/database"
@@ -138,8 +139,10 @@ func (s *Serializer) Edge() []ids.ID { return s.edge.List() }
 func (s *Serializer) parseVertex(b []byte) (*vertex, error) {
 	vtx := &vertex{}
 	if err := vtx.Unmarshal(b, s.vm); err != nil {
+		fmt.Printf("parseVertex returning nil due to failed to unmarshal")
 		return nil, err
 	} else if !vtx.chainID.Equals(s.ctx.ChainID) {
+		fmt.Printf("parseVertex returning nil due to wrong chain id")
 		return nil, errWrongChainID
 	}
 	return vtx, nil
