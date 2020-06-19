@@ -24,16 +24,20 @@ type uniqueVertex struct {
 	serializer *Serializer
 
 	vtxID ids.ID
+	bytes []byte
 	v     *vertexState
 }
 
 func (vtx *uniqueVertex) refresh() {
+	// Prevent segfault
 	if vtx.v == nil {
 		vtx.v = &vertexState{}
 	}
 	if !vtx.v.unique {
 		unique := vtx.serializer.state.UniqueVertex(vtx)
 		prevVtx := vtx.v.vtx
+		// If de-duplicator did not return a different value from cache
+		// Then get status from db and set unique to true
 		if unique == vtx {
 			vtx.v.status = vtx.serializer.state.Status(vtx.ID())
 			vtx.v.unique = true
@@ -42,7 +46,21 @@ func (vtx *uniqueVertex) refresh() {
 			*vtx = *unique
 		}
 
+		// Try to parse vertex
+		if vtx.v.vtx == nil && prevVtx == nil && vtx.bytes != nil {
+			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err != nil {
+				vtx.v.vtx = parsedVtx
+			}
+		}
 		switch {
+		case vtx.v.vtx == nil && prevVtx == nil && vtx.bytes != nil:
+			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err != nil {
+				vtx.v.vtx = parsedVtx
+				vtx.storeAndUpdateStatus()
+			} else {
+				vtx.v.validity = err
+				vtx.v.verified = true
+			}
 		case vtx.v.vtx == nil && prevVtx == nil:
 			vtx.v.vtx = vtx.serializer.state.Vertex(vtx.ID())
 		case vtx.v.vtx == nil:
@@ -63,6 +81,14 @@ func (vtx *uniqueVertex) setVertex(innerVtx *vertex) {
 		vtx.v.vtx = innerVtx
 		vtx.serializer.state.SetVertex(innerVtx)
 		vtx.setStatus(choices.Processing)
+	}
+}
+
+// Assumes vtx.v.vtx != nil
+func (vtx *uniqueVertex) storeAndUpdateStatus() {
+	vtx.serializer.state.SetVertex(vtx.v.vtx)
+	if status := vtx.serializer.state.Status(vtx.ID()); status == choices.Unknown {
+		vtx.serializer.state.SetStatus(vtx.ID(), choices.Processing)
 	}
 }
 
@@ -140,9 +166,23 @@ func (vtx *uniqueVertex) Txs() []snowstorm.Tx {
 	return vtx.v.txs
 }
 
-func (vtx *uniqueVertex) Bytes() []byte { return vtx.v.vtx.Bytes() }
+func (vtx *uniqueVertex) Bytes() []byte {
+	if vtx.bytes != nil {
+		return vtx.bytes
+	} else {
+		return vtx.v.vtx.Bytes()
+	}
+}
 
-func (vtx *uniqueVertex) Verify() error { return vtx.v.vtx.Verify() }
+func (vtx *uniqueVertex) Verify() error {
+	if vtx.v.verified {
+		return vtx.v.validity
+	} else {
+		vtx.v.validity = vtx.v.vtx.Verify()
+		vtx.v.verified = true
+		return vtx.v.validity
+	}
+}
 
 func (vtx *uniqueVertex) String() string {
 	sb := strings.Builder{}
@@ -174,10 +214,11 @@ func (vtx *uniqueVertex) String() string {
 }
 
 type vertexState struct {
-	unique bool
+	unique, verified bool
 
-	vtx    *vertex
-	status choices.Status
+	validity error
+	vtx      *vertex
+	status   choices.Status
 
 	parents []avalanche.Vertex
 	txs     []snowstorm.Tx
