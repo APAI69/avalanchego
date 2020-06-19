@@ -49,7 +49,9 @@ func (vtx *uniqueVertex) refresh() {
 		} else {
 			// If someone is in the cache, they must be up to date
 			fmt.Printf("somebody else was in the cache, setting ourselves to be equal\n")
-			*vtx = *unique
+			bytes := vtx.bytes
+			*vtx = *unique // TODO can we switch this to point to the same vertexState???
+			vtx.bytes = bytes
 		}
 
 		switch {
