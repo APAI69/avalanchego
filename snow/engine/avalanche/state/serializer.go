@@ -68,9 +68,7 @@ func (s *Serializer) ParseVertex(b []byte) (avacon.Vertex, error) {
 		bytes:      b,
 	}
 
-	if !uVtx.Status().Fetched() {
-		uVtx.setStatus(choices.Processing)
-	}
+	uVtx.refresh()
 
 	if err := uVtx.Verify(); err != nil {
 		return nil, err
