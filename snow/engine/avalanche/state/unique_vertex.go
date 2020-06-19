@@ -46,18 +46,13 @@ func (vtx *uniqueVertex) refresh() {
 			*vtx = *unique
 		}
 
-		// Try to parse vertex
-		if vtx.v.vtx == nil && prevVtx == nil && vtx.bytes != nil {
-			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err != nil {
-				vtx.v.vtx = parsedVtx
-			}
-		}
 		switch {
 		case vtx.v.vtx == nil && prevVtx == nil && vtx.bytes != nil:
 			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err != nil {
 				vtx.v.vtx = parsedVtx
 				vtx.storeAndUpdateStatus()
 			} else {
+				vtx.v.vtx = &vertex{}
 				vtx.v.validity = err
 				vtx.v.verified = true
 			}

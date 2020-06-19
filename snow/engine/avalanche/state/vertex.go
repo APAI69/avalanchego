@@ -6,6 +6,7 @@ package state
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/ava-labs/gecko/ids"
@@ -43,6 +44,9 @@ func (vtx *vertex) ID() ids.ID    { return vtx.id }
 func (vtx *vertex) Bytes() []byte { return vtx.bytes }
 
 func (vtx *vertex) Verify() error {
+	if vtx == nil {
+		fmt.Printf("I am nil")
+	}
 	switch {
 	case !ids.IsSortedAndUniqueIDs(vtx.parentIDs):
 		return errInvalidParents
