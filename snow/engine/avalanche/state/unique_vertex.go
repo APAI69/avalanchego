@@ -36,43 +36,43 @@ func (vtx *uniqueVertex) refresh() {
 		vtx.v = &vertexState{}
 	}
 	if !vtx.v.unique {
-		fmt.Printf("vertex not unique checking de-duplicator")
+		fmt.Printf("vertex not unique checking de-duplicator\n")
 		unique := vtx.serializer.state.UniqueVertex(vtx)
 		prevVtx := vtx.v.vtx
 		// If de-duplicator did not return a different value from cache
 		// Then get status from db and set unique to true
 		if unique == vtx {
-			fmt.Printf("Nobody was in the cache, checking for my own previous status")
+			fmt.Printf("Nobody was in the cache, checking for my own previous status\n")
 			vtx.v.status = vtx.serializer.state.Status(vtx.ID())
 			fmt.Printf("status was: %s", vtx.v.status.String())
 			vtx.v.unique = true
 		} else {
 			// If someone is in the cache, they must be up to date
-			fmt.Printf("somebody else was in the cache, setting ourselves to be equal")
+			fmt.Printf("somebody else was in the cache, setting ourselves to be equal\n")
 			*vtx = *unique
 		}
 
 		switch {
 		case vtx.v.vtx == nil && prevVtx == nil && vtx.bytes != nil:
-			fmt.Printf("parsing unique vertex")
+			fmt.Printf("parsing unique vertex\n")
 			parsed = true
 			if parsedVtx, err := vtx.serializer.parseVertex(vtx.bytes); err != nil {
 				vtx.v.vtx = parsedVtx
 				vtx.storeAndUpdateStatus()
 			} else {
 				parseErrored = true
-				fmt.Printf("error while parsing vertex in unique tx")
+				fmt.Printf("error while parsing vertex in unique tx\n")
 				vtx.v.vtx = &vertex{}
 				vtx.v.validity = err
 				vtx.v.verified = true
 			}
 		case vtx.v.vtx == nil && prevVtx == nil:
-			fmt.Printf("fetching unique vertex from db")
+			fmt.Printf("fetching unique vertex from db\n")
 			vtx.v.vtx = vtx.serializer.state.Vertex(vtx.ID())
 		case vtx.v.vtx == nil:
-			fmt.Printf("setting to prevVtx")
+			fmt.Printf("setting to prevVtx\n")
 			if prevVtx == nil {
-				fmt.Printf("prevVtx was also nil")
+				fmt.Printf("prevVtx was also nil\n")
 			}
 			vtx.v.vtx = prevVtx
 		}
