@@ -44,7 +44,7 @@ func (vtx *uniqueVertex) refresh() {
 		if unique == vtx {
 			fmt.Printf("Nobody was in the cache, checking for my own previous status\n")
 			vtx.v.status = vtx.serializer.state.Status(vtx.ID())
-			fmt.Printf("status was: %s", vtx.v.status.String())
+			fmt.Printf("status was: %s \n", vtx.v.status.String())
 			vtx.v.unique = true
 		} else {
 			// If someone is in the cache, they must be up to date
@@ -82,6 +82,7 @@ func (vtx *uniqueVertex) refresh() {
 		fmt.Printf("Parsed: %v \n", parsed)
 		fmt.Printf("Parse Errored: %v \n", parseErrored)
 	}
+	fmt.Printf("Finished refresh\n")
 }
 
 func (vtx *uniqueVertex) Evict() {

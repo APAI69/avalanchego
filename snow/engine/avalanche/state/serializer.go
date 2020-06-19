@@ -62,13 +62,17 @@ func (s *Serializer) Initialize(ctx *snow.Context, vm avaeng.DAGVM, db database.
 
 // ParseVertex implements the avalanche.State interface
 func (s *Serializer) ParseVertex(b []byte) (avacon.Vertex, error) {
+	fmt.Printf("ParseVertex called\n")
 	uVtx := &uniqueVertex{
 		serializer: s,
 		vtxID:      ids.NewID(hashing.ComputeHash256Array(b)),
 		bytes:      b,
 	}
 
-	uVtx.refresh()
+	uVtx.refresh() // refresh should make it impossible for inner vtx to be nil when bytes is set
+	if uVtx.v.vtx == nil {
+		fmt.Printf("Something went wrong in unique vertex")
+	}
 
 	if err := uVtx.Verify(); err != nil {
 		return nil, err
