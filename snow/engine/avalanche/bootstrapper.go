@@ -5,6 +5,7 @@ package avalanche
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/gecko/cache"
 	"github.com/ava-labs/gecko/ids"
@@ -311,6 +312,9 @@ func (b *bootstrapper) finish() error {
 
 func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge) error {
 	numExecuted := 0
+	b.BootstrapConfig.Context.Log.Info("Pausing before executing state transitions...")
+	time.Sleep(10 * time.Second)
+	b.BootstrapConfig.Context.Log.Info("Starting...")
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		b.BootstrapConfig.Context.Log.Debug("Executing: %s", job.ID())
