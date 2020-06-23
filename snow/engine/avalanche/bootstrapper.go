@@ -314,7 +314,9 @@ func (b *bootstrapper) executeAll(jobs *queue.Jobs, numBlocked prometheus.Gauge)
 	numExecuted := 0
 	b.BootstrapConfig.Context.Log.Info("Pausing before executing state transitions...")
 	time.Sleep(10 * time.Second)
-	b.BootstrapConfig.Context.Log.Info("Starting...")
+	b.BootstrapConfig.Context.Log.Info("Committing Jobs before starting...")
+	jobs.Commit()
+	b.BootstrapConfig.Context.Log.Info("Committed jobs, now starting...")
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		numBlocked.Dec()
 		b.BootstrapConfig.Context.Log.Debug("Executing: %s", job.ID())
