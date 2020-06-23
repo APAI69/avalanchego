@@ -4,6 +4,7 @@
 package versiondb
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -207,7 +208,11 @@ func (db *Database) Abort() {
 	db.abort()
 }
 
-func (db *Database) abort() { db.mem = make(map[string]valueDelete, memdb.DefaultSize) }
+func (db *Database) abort() {
+	fmt.Printf("Length of db.mem: %d\n", len(db.mem))
+	db.mem = make(map[string]valueDelete, memdb.DefaultSize)
+	fmt.Printf("Length of db.mem after clearing: %d\n", len(db.mem))
+}
 
 // CommitBatch returns a batch that will commit all pending writes to the
 // underlying database. The returned batch should be written before future calls
