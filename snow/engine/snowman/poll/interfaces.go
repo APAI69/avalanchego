@@ -17,6 +17,8 @@ type Set interface {
 	Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) (ids.Bag, bool)
 	Drop(requestID uint32, vdr ids.ShortID) (ids.Bag, bool)
 	Len() int
+
+	Shutdown() error
 }
 
 // Poll is an outstanding poll

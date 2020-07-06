@@ -375,6 +375,10 @@ func (dg *Directed) redirectEdge(fn *flatNode, conflictID ids.ID) {
 	}
 }
 
+func (dg *Directed) Shutdown() error {
+	return dg.metrics.Shutdown()
+}
+
 func (dg *Directed) removeConflict(id ids.ID, ids ...ids.ID) {
 	for _, neighborID := range ids {
 		neighborKey := neighborID.Key()

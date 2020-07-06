@@ -26,6 +26,8 @@ type set struct {
 	durPolls prometheus.Histogram
 	factory  Factory
 	polls    map[uint32]poll
+
+	registerer prometheus.Registerer
 }
 
 // NewSet returns a new empty set of polls
@@ -55,11 +57,12 @@ func NewSet(
 	}
 
 	return &set{
-		log:      log,
-		numPolls: numPolls,
-		durPolls: durPolls,
-		factory:  factory,
-		polls:    make(map[uint32]poll),
+		log:        log,
+		numPolls:   numPolls,
+		durPolls:   durPolls,
+		factory:    factory,
+		polls:      make(map[uint32]poll),
+		registerer: registerer,
 	}
 }
 
@@ -155,4 +158,16 @@ func (s *set) String() string {
 		sb.WriteString(fmt.Sprintf("\n    %d: %s", requestID, poll))
 	}
 	return sb.String()
+}
+
+func (s *set) Shutdown() error {
+	if s.registerer == nil {
+		return nil
+	}
+
+	if s.registerer.Unregister(s.numPolls) && s.registerer.Unregister(s.durPolls) {
+		return nil
+	}
+
+	return fmt.Errorf("could not unregister all snowman poll metrics")
 }

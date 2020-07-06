@@ -58,6 +58,9 @@ type Consensus interface {
 	// possible that after returning finalized, a new decision may be added such
 	// that this instance is no longer finalized.
 	Finalized() bool
+
+	// Shutdown cleans up all resources used by consensus
+	Shutdown() error
 }
 
 // Tx consumes state.

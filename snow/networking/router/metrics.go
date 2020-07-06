@@ -28,8 +28,9 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 }
 
 type metrics struct {
-	pending prometheus.Gauge
-	dropped prometheus.Counter
+	registerer prometheus.Registerer
+	pending    prometheus.Gauge
+	dropped    prometheus.Counter
 	getAcceptedFrontier, acceptedFrontier, getAcceptedFrontierFailed,
 	getAccepted, accepted, getAcceptedFailed,
 	getAncestors, multiPut, getAncestorsFailed,
@@ -42,6 +43,7 @@ type metrics struct {
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer) error {
+	m.registerer = registerer
 	errs := wrappers.Errs{}
 
 	m.pending = prometheus.NewGauge(
@@ -87,4 +89,37 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 	m.shutdown = initHistogram(namespace, "shutdown", registerer, &errs)
 
 	return errs.Err
+}
+
+// Shutdown unregisters metrics
+// must be called after the last metric has been used
+func (m *metrics) Shutdown() error {
+	if m.registerer == nil {
+		return nil
+	}
+
+	if m.registerer.Unregister(m.pending) &&
+		m.registerer.Unregister(m.dropped) &&
+		m.registerer.Unregister(m.getAcceptedFrontier) &&
+		m.registerer.Unregister(m.acceptedFrontier) &&
+		m.registerer.Unregister(m.getAccepted) &&
+		m.registerer.Unregister(m.accepted) &&
+		m.registerer.Unregister(m.getAcceptedFailed) &&
+		m.registerer.Unregister(m.getAncestors) &&
+		m.registerer.Unregister(m.multiPut) &&
+		m.registerer.Unregister(m.getAncestorsFailed) &&
+		m.registerer.Unregister(m.get) &&
+		m.registerer.Unregister(m.put) &&
+		m.registerer.Unregister(m.getFailed) &&
+		m.registerer.Unregister(m.pushQuery) &&
+		m.registerer.Unregister(m.pullQuery) &&
+		m.registerer.Unregister(m.chits) &&
+		m.registerer.Unregister(m.queryFailed) &&
+		m.registerer.Unregister(m.notify) &&
+		m.registerer.Unregister(m.gossip) &&
+		m.registerer.Unregister(m.shutdown) {
+		return nil
+	}
+
+	return fmt.Errorf("could not unregister all chain handler metrics")
 }

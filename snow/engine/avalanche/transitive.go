@@ -109,6 +109,15 @@ func (t *Transitive) Gossip() error {
 // Shutdown implements the Engine interface
 func (t *Transitive) Shutdown() error {
 	t.Config.Context.Log.Info("shutting down consensus engine")
+	if err := t.metrics.Shutdown(); err != nil {
+		t.Config.Context.Log.Error("Error while shutting down consensus engine metrics: %s", err)
+	}
+	if err := t.polls.Shutdown(); err != nil {
+		t.Config.Context.Log.Error("Error while shutting down consensus polls: %s", err)
+	}
+	if err := t.Consensus.Shutdown(); err != nil {
+		t.Config.Context.Log.Error("Error while shutting down consensus metrics: %s", err)
+	}
 	return t.Config.VM.Shutdown()
 }
 

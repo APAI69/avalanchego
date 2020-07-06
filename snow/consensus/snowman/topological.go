@@ -505,3 +505,7 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 	}
 	return nil
 }
+
+func (ts *Topological) Shutdown() error {
+	return ts.metrics.Shutdown()
+}

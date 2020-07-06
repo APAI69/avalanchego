@@ -10,4 +10,5 @@ import (
 // Registrant can register the existence of a chain
 type Registrant interface {
 	RegisterChain(ctx *snow.Context, vm interface{})
+	RestartChain(ctx *snow.Context, vm interface{})
 }

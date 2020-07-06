@@ -68,6 +68,8 @@ type Consensus interface {
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
 	Finalized() bool
+
+	Shutdown() error
 }
 
 // Vertex is a collection of multiple transactions tied to other vertices

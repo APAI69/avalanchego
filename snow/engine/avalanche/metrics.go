@@ -4,12 +4,15 @@
 package avalanche
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/utils/logging"
 )
 
 type metrics struct {
+	registerer                                            prometheus.Registerer
 	numBSPendingRequests, numBSBlockedVtx, numBSBlockedTx prometheus.Gauge
 	numBSVtx, numBSDroppedVtx,
 	numBSTx, numBSDroppedTx prometheus.Counter
@@ -19,6 +22,7 @@ type metrics struct {
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) {
+	m.registerer = registerer
 	m.numBSPendingRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -110,4 +114,25 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 	if err := registerer.Register(m.numPendingVtx); err != nil {
 		log.Error("Failed to register av_blocked_vts statistics due to %s", err)
 	}
+}
+
+func (m *metrics) Shutdown() error {
+	if m.registerer == nil {
+		return nil
+	}
+
+	if m.registerer.Unregister(m.numBSPendingRequests) &&
+		m.registerer.Unregister(m.numBSBlockedVtx) &&
+		m.registerer.Unregister(m.numBSBlockedTx) &&
+		m.registerer.Unregister(m.numBSVtx) &&
+		m.registerer.Unregister(m.numBSDroppedVtx) &&
+		m.registerer.Unregister(m.numBSTx) &&
+		m.registerer.Unregister(m.numBSDroppedTx) &&
+		m.registerer.Unregister(m.numVtxRequests) &&
+		m.registerer.Unregister(m.numTxRequests) &&
+		m.registerer.Unregister(m.numPendingVtx) {
+		return nil
+	}
+
+	return fmt.Errorf("could not unregister all avalanche engine metrics collectors")
 }

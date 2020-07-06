@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/gecko/utils/logging"
@@ -14,10 +16,13 @@ type metrics struct {
 	numBootstrapped, numDropped    prometheus.Counter
 
 	numBlkRequests, numBlockedBlk prometheus.Gauge
+
+	registerer prometheus.Registerer
 }
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) {
+	m.registerer = registerer
 	m.numPendingRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -73,4 +78,21 @@ func (m *metrics) Initialize(log logging.Logger, namespace string, registerer pr
 	if err := registerer.Register(m.numBlockedBlk); err != nil {
 		log.Error("Failed to register sm_blocked_blks statistics due to %s", err)
 	}
+}
+
+func (m *metrics) Shutdown() error {
+	if m.registerer == nil {
+		return nil
+	}
+
+	if m.registerer.Unregister(m.numPendingRequests) &&
+		m.registerer.Unregister(m.numBlocked) &&
+		m.registerer.Unregister(m.numBootstrapped) &&
+		m.registerer.Unregister(m.numDropped) &&
+		m.registerer.Unregister(m.numBlkRequests) &&
+		m.registerer.Unregister(m.numBlockedBlk) {
+		return nil
+	}
+
+	return fmt.Errorf("could not shutdown all snowman consensus engine metrics")
 }

@@ -15,6 +15,7 @@ import (
 )
 
 type metrics struct {
+	registerer               prometheus.Registerer
 	numProcessing            prometheus.Gauge
 	latAccepted, latRejected prometheus.Histogram
 
@@ -24,6 +25,7 @@ type metrics struct {
 
 // Initialize implements the Engine interface
 func (m *metrics) Initialize(log logging.Logger, namespace string, registerer prometheus.Registerer) error {
+	m.registerer = registerer
 	m.processing = make(map[[32]byte]time.Time)
 
 	m.numProcessing = prometheus.NewGauge(
@@ -84,4 +86,15 @@ func (m *metrics) Rejected(id ids.ID) {
 
 	m.latRejected.Observe(float64(end.Sub(start).Milliseconds()))
 	m.numProcessing.Dec()
+}
+
+func (m *metrics) Shutdown() error {
+	if m.registerer == nil {
+		return nil
+	}
+	if m.registerer.Unregister(m.numProcessing) && m.registerer.Unregister(m.latAccepted) && m.registerer.Unregister(m.latRejected) {
+		return nil
+	}
+
+	return fmt.Errorf("could not unregister all snowstorm metrics collectors")
 }

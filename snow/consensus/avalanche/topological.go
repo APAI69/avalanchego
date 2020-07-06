@@ -461,3 +461,18 @@ func (ta *Topological) updateFrontiers() error {
 	}
 	return nil
 }
+
+func (ta *Topological) Shutdown() error {
+	mErr := ta.metrics.Shutdown()
+	var (
+		cgErr error
+	)
+	if ta.cg != nil {
+		cgErr = ta.cg.Shutdown()
+	}
+	if mErr != nil {
+		return mErr
+	}
+	return cgErr
+
+}

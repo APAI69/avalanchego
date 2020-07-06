@@ -454,6 +454,10 @@ func (ig *Input) String() string {
 	return sb.String()
 }
 
+func (ig *Input) Shutdown() error {
+	return ig.metrics.Shutdown()
+}
+
 type inputAccepter struct {
 	ig       *Input
 	deps     ids.Set
