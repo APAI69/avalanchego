@@ -17,6 +17,7 @@ var (
 	errDifferentApps  = errors.New("different applications")
 	errDifferentMajor = errors.New("different major version")
 	errDifferentMinor = errors.New("different minor version")
+	CrashedOnce       = new(int)
 )
 
 // Version defines what is needed to describe a version

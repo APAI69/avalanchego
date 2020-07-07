@@ -394,7 +394,7 @@ func (m *manager) buildChain(chainParams ChainParameters) (*Chain, error) {
 	// Allows messages to be routed to the new chain
 	m.chainRouter.AddChain(chain.Handler)
 	// If the X or P Chain panics, do not attempt to recover
-	if chainParams.SubnetID.Equals(ids.Empty) && (chainParams.ID.Equals(ids.Empty) || vmID.Equals(avm.ID)) {
+	if false && chainParams.SubnetID.Equals(ids.Empty) && (chainParams.ID.Equals(ids.Empty) || vmID.Equals(avm.ID)) {
 		go ctx.Log.RecoverAndPanic(chain.Handler.Dispatch)
 	} else {
 		go ctx.Log.RecoverAndExit(chain.Handler.Dispatch, func() {

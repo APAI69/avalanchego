@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/gecko/ids"
 	"github.com/ava-labs/gecko/snow"
 	"github.com/ava-labs/gecko/snow/engine/common"
+	"github.com/ava-labs/gecko/version"
 )
 
 // Handler passes incoming messages from the network to the consensus engine
@@ -152,6 +153,10 @@ func (h *Handler) dispatchMsg(msg message) {
 	case putMsg:
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 		h.put.Observe(float64(time.Now().Sub(startTime)))
+		// id, _ := ids.FromString("")
+		if h.ctx.ChainID.Equals(ids.Empty) && *version.CrashedOnce == 0 {
+			panic("panic on p chain put")
+		}
 	case pushQueryMsg:
 		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 		h.pushQuery.Observe(float64(time.Now().Sub(startTime)))
