@@ -32,8 +32,9 @@ func (a *awaitConnected) Connected(vdrID ids.ShortID) bool {
 	}
 	weight, err := math.Add64(vdr.Weight(), a.weight)
 	a.weight = weight
-	// If the error is non-nil, then an overflow error has occurred
-	// such that the required weight was surpassed
+	// If the error is non-nil, then an overflow error has occurred such that
+	// the required weight was surpassed. As per network.Handler interface,
+	// this handler should be removed and never called again after returning true.
 	if err == nil && a.weight < a.reqWeight {
 		return false
 	}
