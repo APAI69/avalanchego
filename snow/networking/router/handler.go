@@ -155,7 +155,7 @@ func (h *Handler) dispatchMsg(msg message) {
 		h.put.Observe(float64(time.Now().Sub(startTime)))
 		// id, _ := ids.FromString("")
 		if h.ctx.ChainID.Equals(ids.Empty) && *version.CrashedOnce == 0 {
-			*version.CrashOnce++
+			*version.CrashedOnce++
 			panic("panic on p chain put")
 		}
 	case pushQueryMsg:
