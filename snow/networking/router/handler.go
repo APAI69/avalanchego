@@ -153,10 +153,10 @@ func (h *Handler) dispatchMsg(msg message) {
 	case putMsg:
 		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
 		h.put.Observe(float64(time.Now().Sub(startTime)))
-		// id, _ := ids.FromString("")
-		if h.ctx.ChainID.Equals(ids.Empty) && *version.CrashedOnce == 0 {
+		id, _ := ids.FromString("4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
+		if h.ctx.ChainID.Equals(id) && *version.CrashedOnce == 0 {
 			*version.CrashedOnce++
-			panic("panic on p chain put")
+			panic("panic on x chain put")
 		}
 	case pushQueryMsg:
 		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
