@@ -558,13 +558,16 @@ func (m *manager) createSnowmanChain(
 }
 
 func (m *manager) IsBootstrapped(id ids.ID) bool {
+	start := time.Now()
 	chain, exists := m.chains[id.Key()]
 	if !exists {
 		return false
 	}
 	chain.Context().Lock.Lock()
 	defer chain.Context().Lock.Unlock()
-	return chain.Engine().IsBootstrapped()
+	bootstrapped := chain.Engine().IsBootstrapped()
+	m.log.Info("IsBootstrapped took %d seconds", time.Since(start).Seconds())
+	return bootstrapped
 }
 
 // Shutdown stops all the chains

@@ -148,13 +148,16 @@ type IsBootstrappedResponse struct {
 // Returns an error if the chain doesn't exist
 func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *IsBootstrappedResponse) error {
 	service.log.Info("Info: IsBootstrapped called")
+
 	if args.Chain == "" {
 		return fmt.Errorf("argument 'chain' not given")
 	}
 	chainID, err := service.chainManager.Lookup(args.Chain)
+	service.log.Info("Found chainID: %s", chainID.String())
 	if err != nil {
 		return fmt.Errorf("there is no chain with alias/ID '%s'", args.Chain)
 	}
 	reply.IsBootstrapped = service.chainManager.IsBootstrapped(chainID)
+	service.log.Info("IsBootstrapped call finished")
 	return nil
 }
