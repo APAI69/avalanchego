@@ -28,8 +28,9 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 }
 
 type metrics struct {
-	pending prometheus.Gauge
-	dropped prometheus.Counter
+	pending  prometheus.Gauge
+	dropped  prometheus.Counter
+	timedOut prometheus.Counter
 	getAcceptedFrontier, acceptedFrontier, getAcceptedFrontierFailed,
 	getAccepted, accepted, getAcceptedFailed,
 	getAncestors, multiPut, getAncestorsFailed,
@@ -60,6 +61,13 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 			Namespace: namespace,
 			Name:      "dropped",
 			Help:      "Number of dropped events",
+		})
+
+	m.timedOut = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "timedOut",
+			Help:      "Number of timed out events",
 		})
 
 	if err := registerer.Register(m.dropped); err != nil {

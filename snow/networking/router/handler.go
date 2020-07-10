@@ -86,6 +86,7 @@ func (h *Handler) Dispatch() {
 				h.ctx.Log.Verbo("Dropping message due to likely timeout: %s", msg)
 				h.metrics.pending.Dec()
 				h.metrics.dropped.Inc()
+				h.metrics.timedOut.Inc()
 				continue
 			}
 
