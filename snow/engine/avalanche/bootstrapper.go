@@ -110,7 +110,7 @@ func (b *bootstrapper) FilterAccepted(containerIDs ids.Set) ids.Set {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *bootstrapper) fetch(vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() < common.MaxOutstandingRequests {
+	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 
@@ -212,6 +212,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 // MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
+	b.BootstrapConfig.Context.Log.Debug("MultiPut(%s, %d) contains %d vtxs", vdr, requestID, len(vtxs))
 	if lenVtxs := len(vtxs); lenVtxs > common.MaxContainersPerMultiPut {
 		b.BootstrapConfig.Context.Log.Debug("MultiPut(%s, %d) contains more than maximum number of vertices", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
@@ -265,6 +266,8 @@ func (b *bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 			break
 		}
 		vtxID := vtx.ID()
+		// Send excess GetAncestors request to take up peer's CPU time
+		b.BootstrapConfig.Sender.GetAncestors(vdr, requestID+1, vtxID)
 		if !eligibleVertices.Contains(vtxID) {
 			b.BootstrapConfig.Context.Log.Debug("received vertex that should not have been included in MultiPut from %s with vertexID %s", vdr, vtxID)
 			break
