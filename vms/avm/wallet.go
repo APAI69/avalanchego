@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avmwallet
+package avm
 
 import (
 	"errors"
@@ -14,18 +14,18 @@ import (
 	"github.com/ava-labs/gecko/utils/codec"
 	"github.com/ava-labs/gecko/utils/crypto"
 	"github.com/ava-labs/gecko/utils/logging"
-	"github.com/ava-labs/gecko/utils/math"
+	safemath "github.com/ava-labs/gecko/utils/math"
 	"github.com/ava-labs/gecko/utils/timer"
 	"github.com/ava-labs/gecko/utils/wrappers"
-	"github.com/ava-labs/gecko/vms/avm"
 	"github.com/ava-labs/gecko/vms/components/avax"
 	"github.com/ava-labs/gecko/vms/secp256k1fx"
 )
 
 // Wallet is a holder for keys and UTXOs for the Avalanche DAG.
 type Wallet struct {
-	networkID uint32
-	chainID   ids.ID
+	networkID   uint32
+	chainID     ids.ID
+	avaxAssetID ids.ID
 
 	clock timer.Clock
 	codec codec.Codec
@@ -37,19 +37,19 @@ type Wallet struct {
 	balance map[[32]byte]uint64
 	txFee   uint64
 
-	txs []*avm.Tx
+	txs []*Tx
 }
 
 // NewWallet returns a new Wallet
-func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint64) (*Wallet, error) {
+func NewWallet(log logging.Logger, networkID uint32, chainID, avaxAssetID ids.ID, txFee uint64) (*Wallet, error) {
 	c := codec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
-		c.RegisterType(&avm.BaseTx{}),
-		c.RegisterType(&avm.CreateAssetTx{}),
-		c.RegisterType(&avm.OperationTx{}),
-		c.RegisterType(&avm.ImportTx{}),
-		c.RegisterType(&avm.ExportTx{}),
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
@@ -57,14 +57,15 @@ func NewWallet(log logging.Logger, networkID uint32, chainID ids.ID, txFee uint6
 		c.RegisterType(&secp256k1fx.Credential{}),
 	)
 	return &Wallet{
-		networkID: networkID,
-		chainID:   chainID,
-		codec:     c,
-		log:       log,
-		keychain:  secp256k1fx.NewKeychain(),
-		utxoSet:   &UTXOSet{},
-		balance:   make(map[[32]byte]uint64),
-		txFee:     txFee,
+		networkID:   networkID,
+		chainID:     chainID,
+		avaxAssetID: avaxAssetID,
+		codec:       c,
+		log:         log,
+		keychain:    secp256k1fx.NewKeychain(),
+		utxoSet:     &UTXOSet{},
+		balance:     make(map[[32]byte]uint64),
+		txFee:       txFee,
 	}, errs.Err
 }
 
@@ -128,87 +129,117 @@ func (w *Wallet) RemoveUTXO(utxoID ids.ID) {
 func (w *Wallet) Balance(assetID ids.ID) uint64 { return w.balance[assetID.Key()] }
 
 // CreateTx returns a tx that sends [amount] of [assetID] to [destAddr]
-func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (*avm.Tx, error) {
+func (w *Wallet) CreateTx(assetID ids.ID, amount uint64, destAddr ids.ShortID) (*Tx, error) {
 	if amount == 0 {
 		return nil, errors.New("invalid amount")
 	}
 
-	amountSpent := uint64(0)
+	amounts := map[[32]byte]uint64{
+		assetID.Key(): uint64(amount),
+	}
+
+	amountsWithFee := make(map[[32]byte]uint64, len(amounts)+1)
+	for k, v := range amounts {
+		amountsWithFee[k] = v
+	}
+	avaxKey := w.avaxAssetID.Key()
+	amountWithFee, err := safemath.Add64(amountsWithFee[avaxKey], w.txFee)
+	if err != nil {
+		return nil, fmt.Errorf("problem calculating required spend amount: %w", err)
+	}
+	amountsWithFee[avaxKey] = amountWithFee
+
+	amountsSpent := make(map[[32]byte]uint64, len(amounts))
 	time := w.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range w.utxoSet.UTXOs {
-		if !utxo.AssetID().Equals(assetID) {
+		assetID := utxo.AssetID()
+		assetKey := assetID.Key()
+		amount := amountsWithFee[assetKey]
+		amountSpent := amountsSpent[assetKey]
+
+		if amountSpent >= amount {
+			// we already have enough inputs allocated to this asset
 			continue
 		}
+
 		inputIntf, signers, err := w.keychain.Spend(utxo.Out, time)
 		if err != nil {
+			// this utxo can't be spent with the current keys right now
 			continue
 		}
 		input, ok := inputIntf.(avax.TransferableIn)
 		if !ok {
+			// this input doesn't have an amount, so I don't care about it here
 			continue
 		}
-		spent, err := math.Add64(amountSpent, input.Amount())
+		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
 		if err != nil {
-			return nil, err
+			// there was an error calculating the consumed amount, just error
+			return nil, errSpendOverflow
 		}
-		amountSpent = spent
+		amountsSpent[assetKey] = newAmountSpent
 
-		in := &avax.TransferableInput{
+		// add the new input to the array
+		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  avax.Asset{ID: assetID},
 			In:     input,
-		}
-
-		ins = append(ins, in)
+		})
+		// add the required keys to the array
 		keys = append(keys, signers)
-
-		if amountSpent >= amount {
-			break
-		}
 	}
 
-	if amountSpent < amount {
-		return nil, errors.New("insufficient funds")
+	// Check if the amounts spent covers the amount plus the fee
+	for asset, amount := range amountsWithFee {
+		if amountsSpent[asset] < amount {
+			return nil, errInsufficientFunds
+		}
 	}
 
 	avax.SortTransferableInputsWithSigners(ins, keys)
 
-	outs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: amount,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{destAddr},
-			},
-		},
-	}}
+	outs := []*avax.TransferableOutput{}
+	for asset, amountWithFee := range amountsWithFee {
+		assetID := ids.NewID(asset)
+		amount := amounts[asset]
+		amountSpent := amountsSpent[asset]
 
-	if amountSpent > amount {
-		changeAddr, err := w.GetAddress()
-		if err != nil {
-			return nil, err
-		}
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - amount,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
+		if amount > 0 {
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: assetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amount,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{destAddr},
+					},
 				},
-			},
-		})
+			})
+		}
+
+		if amountSpent > amountWithFee {
+			changeAddr := w.keychain.Keys[0].PublicKey().Address()
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: assetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amountSpent - amountWithFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{changeAddr},
+					},
+				},
+			})
+		}
 	}
 
 	avax.SortTransferableOutputs(outs, w.codec)
 
-	tx := &avm.Tx{UnsignedTx: &avm.BaseTx{BaseTx: avax.BaseTx{
+	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.networkID,
 		BlockchainID: w.chainID,
 		Outs:         outs,
@@ -232,8 +263,11 @@ func (w *Wallet) GenerateTxs(numTxs int, assetID ids.ID) error {
 	if frequency > 1000 {
 		frequency = 1000
 	}
+	if frequency == 0 {
+		frequency = 1
+	}
 
-	w.txs = make([]*avm.Tx, numTxs)
+	w.txs = make([]*Tx, numTxs)
 	for i := 0; i < numTxs; i++ {
 		addr, err := w.CreateAddress()
 		if err != nil {
@@ -263,13 +297,13 @@ func (w *Wallet) GenerateTxs(numTxs int, assetID ids.ID) error {
 }
 
 // NextTx returns the next tx to be sent as part of xput test
-func (w *Wallet) NextTx() *avm.Tx {
+func (w *Wallet) NextTx() (*Tx, error) {
 	if len(w.txs) == 0 {
-		return nil
+		return nil, errors.New("no more transactions remaining")
 	}
 	tx := w.txs[0]
 	w.txs = w.txs[1:]
-	return tx
+	return tx, nil
 }
 
 func (w *Wallet) String() string {

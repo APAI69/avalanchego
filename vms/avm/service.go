@@ -9,6 +9,9 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/ava-labs/gecko/snow/consensus/snowstorm"
 
 	"github.com/ava-labs/gecko/api"
 	"github.com/ava-labs/gecko/ids"
@@ -45,7 +48,10 @@ var (
 )
 
 // Service defines the base service for the asset vm
-type Service struct{ vm *VM }
+type Service struct {
+	vm         *VM
+	xputTxList []snowstorm.Tx
+}
 
 // FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
 type FormattedTx struct {
@@ -1515,5 +1521,114 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply 
 	}
 
 	reply.TxID = txID
+	return nil
+}
+
+// CreateXPutTxsArgs ...
+type CreateXPutTxsArgs struct {
+	PrivateKey string `json:"privateKey"`
+	NumTxs     int    `json:"numTxs"`
+}
+
+// CreateXPutTxs ...
+func (service *Service) CreateXPutTxs(_ *http.Request, args *CreateXPutTxsArgs, reply *api.SuccessResponse) error {
+	xputWallet, err := NewWallet(
+		service.vm.ctx.Log,
+		service.vm.ctx.NetworkID,
+		service.vm.ctx.ChainID,
+		service.vm.ctx.AVAXAssetID,
+		service.vm.txFee,
+	)
+	if err != nil {
+		return err
+	}
+
+	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
+		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
+	}
+	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
+	formattedPrivateKey := formatting.CB58{}
+	if err := formattedPrivateKey.FromString(trimmedPrivateKey); err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+
+	factory := crypto.FactorySECP256K1R{}
+	skIntf, err := factory.ToPrivateKey(formattedPrivateKey.Bytes)
+	if err != nil {
+		return fmt.Errorf("problem parsing private key: %w", err)
+	}
+	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
+
+	xputWallet.ImportKey(sk)
+	addr := sk.PublicKey().Address()
+
+	addrSet := ids.ShortSet{}
+	addrSet.Add(addr)
+
+	utxos, _, _, err := service.vm.GetUTXOs(
+		addrSet,
+		ids.ShortEmpty,
+		ids.Empty,
+		0,
+	)
+	if err != nil {
+		return fmt.Errorf("problem retrieving UTXOs: %w", err)
+	}
+
+	for _, utxo := range utxos {
+		xputWallet.AddUTXO(utxo)
+	}
+
+	if err := xputWallet.GenerateTxs(args.NumTxs, service.vm.ctx.AVAXAssetID); err != nil {
+		return err
+	}
+
+	txs := make([]snowstorm.Tx, 0, args.NumTxs)
+	for i := 0; i < args.NumTxs; i++ {
+		nextTx, err := xputWallet.NextTx()
+		if err != nil {
+			return err
+		}
+		tx, err := service.vm.parseTx(nextTx.Bytes())
+		if err != nil {
+			return err
+		}
+
+		txs = append(txs, tx)
+	}
+
+	service.xputTxList = txs
+	reply.Success = true
+	return nil
+}
+
+// IssueXPutTxsArgs ...
+type IssueXPutTxsArgs struct {
+	BatchSize int `json:"numTxs"`
+	Delay     int `json:"delay"`
+}
+
+// IssueXPutTxs ...
+func (service *Service) IssueXPutTxs(_ *http.Request, args *IssueXPutTxsArgs, reply *api.SuccessResponse) error {
+	if len(service.xputTxList) == 0 {
+		return errors.New("No throughput transactions to issue")
+	}
+
+	txs := service.xputTxList
+	service.xputTxList = nil
+	go func() {
+		service.vm.ctx.Log.Info("Attempting to issue %d transactions.", len(txs))
+		for i := 0; i < len(txs); {
+			service.vm.ctx.Lock.Lock()
+			for j := i; j < len(txs) && j < i+args.BatchSize; j++ {
+				service.vm.issueTx(txs[j])
+				i++
+			}
+			service.vm.ctx.Lock.Unlock()
+			time.Sleep(time.Duration(args.Delay) * time.Second)
+		}
+	}()
+
+	reply.Success = true
 	return nil
 }

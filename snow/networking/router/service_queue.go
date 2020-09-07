@@ -68,8 +68,10 @@ func newMultiLevelQueue(
 ) (messageQueue, chan struct{}) {
 	semaChan := make(chan struct{}, bufferSize)
 	singleLevelSize := bufferSize / len(consumptionRanges)
-	cpuTracker := throttler.NewEWMATracker(vdrs, cpuPortion, cpuInterval, log)
-	msgThrottler := throttler.NewMessageThrottler(vdrs, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, log)
+	// cpuTracker := throttler.NewEWMATracker(vdrs, cpuPortion, cpuInterval, log)
+	// msgThrottler := throttler.NewMessageThrottler(vdrs, uint32(bufferSize), maxNonStakerPendingMsgs, msgPortion, log)
+	cpuTracker := throttler.NewNoCPUTracker()
+	msgThrottler := throttler.NewNoCountThrottler()
 	queues := make([]singleLevelQueue, len(consumptionRanges))
 	for index := 0; index < len(queues); index++ {
 		gauge, histogram, err := metrics.registerTierStatistics(index)

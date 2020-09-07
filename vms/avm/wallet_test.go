@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avmwallet
+package avm
 
 import (
 	"testing"
@@ -15,7 +15,8 @@ import (
 
 func TestNewWallet(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +27,8 @@ func TestNewWallet(t *testing.T) {
 
 func TestWalletGetAddress(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +44,8 @@ func TestWalletGetAddress(t *testing.T) {
 
 func TestWalletGetMultipleAddresses(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +65,8 @@ func TestWalletGetMultipleAddresses(t *testing.T) {
 
 func TestWalletEmptyBalance(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +78,8 @@ func TestWalletEmptyBalance(t *testing.T) {
 
 func TestWalletAddUTXO(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +101,8 @@ func TestWalletAddUTXO(t *testing.T) {
 
 func TestWalletAddInvalidUTXO(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +121,8 @@ func TestWalletAddInvalidUTXO(t *testing.T) {
 
 func TestWalletCreateTx(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,9 +170,51 @@ func TestWalletCreateTx(t *testing.T) {
 	}
 }
 
+func TestWalletGenerateTxs(t *testing.T) {
+	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	txFee := uint64(1000000)
+	numTxs := 10
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, txFee)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	addr, err := w.CreateAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: ids.Empty.Prefix(1)},
+		Asset:  avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: txFee * uint64(numTxs+1),
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		},
+	}
+
+	w.AddUTXO(utxo)
+
+	err = w.GenerateTxs(numTxs, avaxAssetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < numTxs; i++ {
+		_, err := w.NextTx()
+		if err != nil {
+			t.Fatalf("NextTx errored on iteration %d due to %w", i, err)
+		}
+	}
+}
+
 func TestWalletImportKey(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +239,8 @@ func TestWalletImportKey(t *testing.T) {
 
 func TestWalletString(t *testing.T) {
 	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
+	avaxAssetID := ids.NewID([32]byte{'a', 'v', 'a', 'x'})
+	w, err := NewWallet(logging.NoLog{}, 12345, chainID, avaxAssetID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
