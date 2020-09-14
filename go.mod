@@ -26,6 +26,7 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/cors v1.7.0
 	github.com/stretchr/testify v1.4.0
+	github.com/subchen/go-trylock v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2

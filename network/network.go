@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/subchen/go-trylock"
 )
 
 // reasonable default values
@@ -132,7 +132,7 @@ type network struct {
 
 	b Builder
 
-	stateLock       sync.Mutex
+	stateLock       trylock.TryLocker
 	pendingBytes    int
 	closed          bool
 	disconnectedIPs map[string]struct{}
@@ -240,6 +240,7 @@ func NewNetwork(
 		vdrs:           vdrs,
 		beacons:        beacons,
 		router:         router,
+		stateLock:		trylock.New(),
 		// This field just makes sure we don't connect to ourselves when TLS is
 		// disabled. So, cryptographically secure random number generation isn't
 		// used here.
@@ -278,7 +279,10 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline.Sub(n.clock.Time())))
 	n.log.AssertNoError(err)
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	for _, validatorID := range validatorIDs.List() {
@@ -312,7 +316,10 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 		return // Packing message failed
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peer, sent := n.peers[validatorID.Key()]
@@ -347,7 +354,10 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		return
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	for _, validatorID := range validatorIDs.List() {
@@ -382,7 +392,10 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return // Packing message failed
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peer, sent := n.peers[validatorID.Key()]
@@ -409,7 +422,10 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 		return
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peer, sent := n.peers[validatorID.Key()]
@@ -437,7 +453,10 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peer, sent := n.peers[validatorID.Key()]
@@ -461,7 +480,10 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	msg, err := n.b.Get(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peer, sent := n.peers[validatorID.Key()]
@@ -494,7 +516,10 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 		return
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peer, sent := n.peers[validatorID.Key()]
@@ -533,7 +558,10 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		return // Packing message failed
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	for _, validatorID := range validatorIDs.List() {
@@ -562,7 +590,10 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline.Sub(n.clock.Time())), containerID)
 	n.log.AssertNoError(err)
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	for _, validatorID := range validatorIDs.List() {
@@ -597,7 +628,10 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 		return
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peer, sent := n.peers[validatorID.Key()]
@@ -661,7 +695,10 @@ func (n *network) Dispatch() error {
 
 // IPs implements the Network interface
 func (n *network) Peers() []PeerID {
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	peers := []PeerID{}
@@ -686,8 +723,10 @@ func (n *network) Close() error {
 	if err != nil {
 		n.log.Debug("closing network listener failed with: %s", err)
 	}
-
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	if n.closed {
 		n.stateLock.Unlock()
 		return nil
@@ -708,7 +747,10 @@ func (n *network) Close() error {
 
 // Track implements the Network interface
 func (n *network) Track(ip utils.IPDesc) {
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Error("Statelock timeout reached, will panic")
+		panic("Statelock timeout reached, will panic")
+	}
 	defer n.stateLock.Unlock()
 
 	n.track(ip)
@@ -721,7 +763,10 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	allPeers := make([]*peer, 0, len(n.peers))
@@ -792,7 +837,10 @@ func (n *network) gossip() {
 			continue
 		}
 
-		n.stateLock.Lock()
+		if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+			n.log.Fatal("State lock timeout reached, will panic")
+			panic("State lock timed out")
+		}
 		if n.closed {
 			n.stateLock.Unlock()
 			return
@@ -863,7 +911,10 @@ func (n *network) gossip() {
 // the network is closed
 func (n *network) connectTo(ip utils.IPDesc) {
 	str := ip.String()
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	delay := n.retryDelay[str]
 	n.stateLock.Unlock()
 
@@ -883,7 +934,10 @@ func (n *network) connectTo(ip utils.IPDesc) {
 			delay = time.Duration(float64(n.maxReconnectDelay) * (3 + rand.Float64()) / 4)
 		}
 
-		n.stateLock.Lock()
+		if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+			n.log.Fatal("State lock timeout reached, will panic")
+			panic("State lock timed out")
+		}
 		_, isDisconnected := n.disconnectedIPs[str]
 		_, isConnected := n.connectedIPs[str]
 		_, isMyself := n.myIPs[str]
@@ -954,7 +1008,10 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 func (n *network) tryAddPeer(p *peer) error {
 	key := p.id.Key()
 
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	if n.closed {
@@ -1001,7 +1058,10 @@ func (n *network) tryAddPeer(p *peer) error {
 // assumes the stateLock is not held. Returns the ips of connections that have
 // valid IPs that are marked as validators.
 func (n *network) validatorIPs() []utils.IPDesc {
-	n.stateLock.Lock()
+	if ok := n.stateLock.TryLock(2 * time.Second); !ok {
+		n.log.Fatal("State lock timeout reached, will panic")
+		panic("State lock timed out")
+	}
 	defer n.stateLock.Unlock()
 
 	ips := []utils.IPDesc(nil)
