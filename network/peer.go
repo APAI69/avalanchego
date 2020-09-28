@@ -561,7 +561,20 @@ func (p *peer) peerList(msg Msg) {
 func (p *peer) ping(_ Msg) { p.Pong() }
 
 // assumes the stateLock is not held
-func (p *peer) pong(_ Msg) {}
+func (p *peer) pong(_ Msg) {
+	p.net.pingTrackerLock.Lock()
+	defer p.net.pingTrackerLock.Unlock()
+
+	key := p.id.Key()
+	pingSent, ok := p.net.pingTracker[key]
+	if !ok {
+		return
+	}
+
+	pongLatency := time.Since(pingSent)
+	p.net.log.Info("Received pong from peer: %s, with latency: %s", p.id, pongLatency)
+	delete(p.net.pingTracker, key)
+}
 
 // assumes the stateLock is not held
 func (p *peer) getAcceptedFrontier(msg Msg) {

@@ -52,9 +52,48 @@ var (
 	errNetworkClosed        = errors.New("network closed")
 	errPeerIsMyself         = errors.New("peer is myself")
 	errDuplicatedConnection = errors.New("duplicated connection")
+	pingIPs                 = []utils.IPDesc{}
+	pingValidatorIDs        = []ids.ShortID{}
 )
 
-func init() { rand.Seed(time.Now().UnixNano()) }
+func init() {
+	rand.Seed(time.Now().UnixNano())
+	validatorIDStrings := []string{
+		"A6onFGyJjA37EZ7kYHANMR1PFRT8NmXrF",
+		"6SwnPJLH8cWfrJ162JjZekbmzaFpjPcf",
+		"GSgaA47umS1px2ohVjodW9621Ks63xDxD",
+		"BQEo5Fy1FRKLbX51ejqDd14cuSXJKArH2",
+		"Drv1Qh7iJvW3zGBBeRnYfCzk56VCRM2GQ",
+		"DAtCoXfLT6Y83dgJ7FmQg8eR53hz37J79",
+		"FGRoKnyYKFWYFMb6Xbocf4hKuyCBENgWM",
+		"Dw7tuwxpAmcpvVGp9JzaHAR3REPoJ8f2R",
+		"4kCLS16Wy73nt1Zm54jFZsL7Msrv3UCeJ",
+		"9T7NXBFpp8LWCyc58YdKNoowDipdVKAWz",
+		"6ghBh6yof5ouMCya2n9fHzhpWouiZFVVj",
+		"HiFv1DpKXkAAfJ1NHWVqQoojjznibZXHP",
+		"Fv3t2shrpkmvLnvNzcv1rqRKbDAYFnUor",
+		"AaxT2P4uuPAHb7vAD8mNvjQ3jgyaV7tu9",
+		"kZNuQMHhydefgnwjYX1fhHMpRNAs9my1",
+		"A7GwTSd47AcDVqpTVj7YtxtjHREM33EJw",
+		"Hr78Fy8uDYiRYocRYHXp4eLCYeb8x5UuM",
+		"9CkG9MBNavnw7EVSRsuFr7ws9gascDQy3",
+		"A8jypu63CWp76STwKdqP6e9hjL675kdiG",
+		"HsBEx3L71EHWSXaE6gvk2VsNntFEZsxqc",
+		"Nr584bLpGgbCUbZFSBaBz3Xum5wpca9Ym",
+		"QKGoUvqcgormCoMj6yPw9isY7DX9H4mdd",
+		"HCw7S2TVbFPDWNBo1GnFWqJ47f9rDJtt1",
+		"FYv1Lb29SqMpywYXH7yNkcFAzRF2jvm3K",
+	}
+	validatorIDs := make([]ids.ShortID, 0)
+	for _, str := range validatorIDStrings {
+		id, err := ids.ShortFromString(str)
+		if err != nil {
+			panic(err)
+		}
+		validatorIDs = append(validatorIDs, id)
+	}
+
+}
 
 // Network defines the functionality of the networking library.
 type Network interface {
@@ -106,6 +145,9 @@ type network struct {
 	vdrs           validators.Set // set of current validators in the Avalanche network
 	beacons        validators.Set // set of beacons in the Avalanche network
 	router         router.Router  // router must be thread safe
+
+	pingTrackerLock sync.Mutex
+	pingTracker     map[[20]byte]time.Time
 
 	nodeID uint32
 
@@ -608,6 +650,7 @@ func (n *network) GetHeartbeat() int64 { return atomic.LoadInt64(&n.lastHeartbea
 // to this node.
 func (n *network) Dispatch() error {
 	go n.gossip()
+	// go n.pingScript(pingIPs, pingValidatorIDs)
 	for {
 		conn, err := n.listener.Accept()
 		if err != nil {
@@ -883,6 +926,57 @@ func (n *network) connectTo(ip utils.IPDesc) {
 	}
 }
 
+func (n *network) pingScript(ips []utils.IPDesc, validatorIDs []ids.ShortID) error {
+	if err := n.attemptConnectPeers(ips); err != nil {
+		return err
+	}
+
+	time.Sleep(5 * time.Second)
+
+	if err := n.pingPeers(validatorIDs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *network) attemptConnectPeers(ips []utils.IPDesc) error {
+	for _, ip := range ips {
+		err := n.attemptConnect(ip)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (n *network) pingPeers(validatorIDs []ids.ShortID) error {
+	n.stateLock.Lock()
+	allPeers := make(map[[20]byte]*peer)
+	for key, peer := range n.peers {
+		allPeers[key] = peer
+	}
+	n.stateLock.Unlock()
+
+	peerPings := make(map[[20]byte]time.Time)
+	for _, validatorID := range validatorIDs {
+		key := validatorID.Key()
+		peerPings[key] = time.Now()
+		peer, ok := allPeers[key]
+		if !ok {
+			return fmt.Errorf("not connected to validatorID: %s", validatorID)
+		}
+		peer.Ping()
+	}
+
+	n.pingTrackerLock.Lock()
+	n.pingTracker = peerPings
+	n.pingTrackerLock.Unlock()
+
+	return nil
+}
+
 // assumes the stateLock is not held. Returns nil if a connection was able to be
 // established, or the network is closed.
 func (n *network) attemptConnect(ip utils.IPDesc) error {
@@ -915,6 +1009,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 		_ = p.conn.Close()
 		n.log.Debug("dropping peer connection due to: %s", err)
 	}
+	// n.log.Info("Network connected to IP: %s, validatorID: %s", p.ip, p.id)
 	return nil
 }
 
