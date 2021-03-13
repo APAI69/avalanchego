@@ -13,7 +13,7 @@ BUILD_DIR="$AVALANCHE_PATH/build" # Where binaries go
 PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
 BINARY_PATH="$PLUGIN_DIR/evm"
 
-CORETH_VER="v0.0.0-le.2"
+CORETH_VER="v0.0.0-le.3"
 
 CORETH_PATH="$GOPATH/pkg/mod/github.com/aaronbuchwald/coreth@$CORETH_VER"
 
